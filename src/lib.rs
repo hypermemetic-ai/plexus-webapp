@@ -1,4 +1,4 @@
-//! plexus-website — a Plexus RPC app's frontend, served beside its service.
+//! plexus-webapp — a Plexus RPC app's frontend, served beside its service.
 //!
 //! Begun inside menger (DIST-3, SCAFFOLD-5), a repository of its own since
 //! FRAME-4; menger is one app that takes it. Three pieces:
@@ -32,12 +32,12 @@
 //!
 //! ```text
 //! // build.rs — embed frontend/dist when the `embedded-app` feature is on
-//! fn main() { plexus_website::build::embed_dir_with_feature("frontend/dist", "embedded-app"); }
+//! fn main() { plexus_webapp::build::embed_dir_with_feature("frontend/dist", "embedded-app"); }
 //!
 //! // src/lib.rs
-//! static APP: plexus_website::EmbeddedTable = plexus_website::embedded_app!();
-//! let shell = plexus_website::ShellConfig::new("myapp", plexus_website::AppSource::Embedded(APP));
-//! let server = plexus_website::LocalServer::start(service, plexus_website::LocalConfig::new(shell)).await?;
+//! static APP: plexus_webapp::EmbeddedTable = plexus_webapp::embedded_app!();
+//! let shell = plexus_webapp::ShellConfig::new("myapp", plexus_webapp::AppSource::Embedded(APP));
+//! let server = plexus_webapp::LocalServer::start(service, plexus_webapp::LocalConfig::new(shell)).await?;
 //! println!("{} over {}", server.shell_url(), server.ws_url());
 //! ```
 
@@ -73,7 +73,7 @@ pub const TAURI_ORIGINS: [&str; 3] = ["tauri://localhost", "http://tauri.localho
 
 /// The file [`build::embed_dir`] writes into `OUT_DIR`, which
 /// [`embedded_app!`] includes.
-pub const EMBEDDED_FILE: &str = "plexus_website_app.rs";
+pub const EMBEDDED_FILE: &str = "plexus_webapp_app.rs";
 
 /// The app's build as the crate's build script embedded it — an
 /// [`EmbeddedTable`] expression. Expands in the calling crate, so its
@@ -82,11 +82,11 @@ pub const EMBEDDED_FILE: &str = "plexus_website_app.rs";
 /// table when there is nothing to embed).
 ///
 /// ```text
-/// static APP: plexus_website::EmbeddedTable = plexus_website::embedded_app!();
+/// static APP: plexus_webapp::EmbeddedTable = plexus_webapp::embedded_app!();
 /// ```
 #[macro_export]
 macro_rules! embedded_app {
     () => {
-        include!(concat!(env!("OUT_DIR"), "/plexus_website_app.rs"))
+        include!(concat!(env!("OUT_DIR"), "/plexus_webapp_app.rs"))
     };
 }

@@ -1,4 +1,4 @@
-# plexus-website
+# plexus-webapp
 
 Formerly `plexus-shell`, published on crates.io up to 0.1.3.
 
@@ -30,23 +30,23 @@ A repository of its own beside plexus-core. It began inside
 embedded-app = []
 
 [dependencies]
-plexus-website = "0.2"
+plexus-webapp = "0.2"
 
 [build-dependencies]
-plexus-website = { version = "0.2", default-features = false, features = ["build"] }
+plexus-webapp = { version = "0.2", default-features = false, features = ["build"] }
 ```
 
 ```rust
 // build.rs: embed frontend/dist when `embedded-app` is on
 fn main() {
-    plexus_website::build::embed_dir_with_feature("frontend/dist", "embedded-app");
+    plexus_webapp::build::embed_dir_with_feature("frontend/dist", "embedded-app");
 }
 ```
 
 ```rust
-use plexus_website::{AppSource, EmbeddedTable, LocalConfig, LocalServer, ShellConfig};
+use plexus_webapp::{AppSource, EmbeddedTable, LocalConfig, LocalServer, ShellConfig};
 
-static APP: EmbeddedTable = plexus_website::embedded_app!();
+static APP: EmbeddedTable = plexus_webapp::embedded_app!();
 
 async fn run(service: std::sync::Arc<plexus_core::plexus::DynamicHub>) -> anyhow::Result<()> {
     // the embedded build when there is one, else the checkout's dist
@@ -91,7 +91,7 @@ toy) beside this repository.
 
 ```sh
 cargo test --workspace   # the crate's tests and the toy's
-cargo run -p plexus-website-toy
+cargo run -p plexus-webapp-toy
 ```
 
 MIT.

@@ -1388,7 +1388,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "plexus-website"
+name = "plexus-webapp"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -1404,7 +1404,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "plexus-website-toy"
+name = "plexus-webapp-toy"
 version = "0.0.0"
 dependencies = [
  "anyhow",
@@ -1414,7 +1414,7 @@ dependencies = [
  "jsonrpsee",
  "plexus-core",
  "plexus-macros",
- "plexus-website",
+ "plexus-webapp",
  "schemars",
  "serde",
  "serde_json",
