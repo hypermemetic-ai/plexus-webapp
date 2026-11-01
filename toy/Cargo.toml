@@ -1,9 +1,9 @@
-# SCAFFOLD-5: plexus-shell's worked example — a service with one activation and a
+# SCAFFOLD-5: plexus-website's worked example — a service with one activation and a
 # two-file app, the app embedded by this crate's build script and served by
-# plexus-shell's LocalServer. `cargo test -p plexus-shell-toy` runs it;
-# `cargo run -p plexus-shell-toy` serves it until Ctrl-C. Never published.
+# plexus-website's LocalServer. `cargo test -p plexus-website-toy` runs it;
+# `cargo run -p plexus-website-toy` serves it until Ctrl-C. Never published.
 [package]
-name = "plexus-shell-toy"
+name = "plexus-website-toy"
 version = "0.0.0"
 edition = "2021"
 license = "MIT"
@@ -16,10 +16,10 @@ default = ["embedded-app"]
 embedded-app = []
 
 [build-dependencies]
-plexus-shell = { path = "..", default-features = false, features = ["build"] }
+plexus-website = { path = "..", default-features = false, features = ["build"] }
 
 [dependencies]
-plexus-shell = { path = ".." }
+plexus-website = { path = ".." }
 plexus-core = { path = "../../plexus-core" }
 plexus-macros = { path = "../../plexus-macros" }
 async-trait = "0.1"

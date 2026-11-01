@@ -8,11 +8,11 @@
 //! ```text
 //! // Cargo.toml
 //! [build-dependencies]
-//! plexus-shell = { version = "0.1", default-features = false, features = ["build"] }
+//! plexus-website = { version = "0.2", default-features = false, features = ["build"] }
 //!
 //! // build.rs
 //! fn main() {
-//!     plexus_shell::build::embed_dir_with_feature("frontend/dist", "embedded-app");
+//!     plexus_website::build::embed_dir_with_feature("frontend/dist", "embedded-app");
 //! }
 //! ```
 //!
@@ -38,7 +38,7 @@ pub fn embed_dir(dir: impl AsRef<Path>) -> usize {
         files.sort();
     } else {
         println!(
-            "cargo:warning=plexus-shell: no app build at {} (no index.html); embedding none — build the frontend first",
+            "cargo:warning=plexus-website: no app build at {} (no index.html); embedding none — build the frontend first",
             dist.display()
         );
     }
@@ -99,7 +99,7 @@ fn manifest_dir() -> PathBuf {
 
 fn write(files: &[(String, PathBuf)]) {
     let out = PathBuf::from(std::env::var_os("OUT_DIR").expect("cargo sets OUT_DIR for a build script")).join(crate::EMBEDDED_FILE);
-    std::fs::write(&out, table_source(files)).unwrap_or_else(|e| panic!("plexus-shell: cannot write {}: {e}", out.display()));
+    std::fs::write(&out, table_source(files)).unwrap_or_else(|e| panic!("plexus-website: cannot write {}: {e}", out.display()));
 }
 
 #[cfg(test)]

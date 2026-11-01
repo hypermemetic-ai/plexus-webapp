@@ -1,5 +1,5 @@
 //! SCAFFOLD-5: a tiny service and an embedded two-file app, through
-//! plexus-shell's LocalServer on free ports — `/` is the stamped page, the
+//! plexus-website's LocalServer on free ports — `/` is the stamped page, the
 //! app's asset is served byte-exact, the WebSocket answers a call, and a
 //! shutdown releases both ports.
 
@@ -19,9 +19,9 @@ async fn get(port: u16, path: &str) -> String {
 
 #[tokio::test]
 async fn the_toy_serves_its_embedded_app_and_its_service() {
-    let keys: Vec<_> = plexus_shell_toy::APP.iter().map(|f| f.0).collect();
+    let keys: Vec<_> = plexus_website_toy::APP.iter().map(|f| f.0).collect();
     assert_eq!(keys, ["app.js", "index.html"], "build.rs embedded app/");
-    let server = plexus_shell_toy::start().await.expect("start");
+    let server = plexus_website_toy::start().await.expect("start");
     let (ws, shell) = (server.ws_port(), server.shell_port());
     assert!(ws != 0 && shell != 0 && ws != shell);
 
@@ -29,7 +29,7 @@ async fn the_toy_serves_its_embedded_app_and_its_service() {
     assert!(page.starts_with("HTTP/1.0 200") || page.starts_with("HTTP/1.1 200"), "{page}");
     assert!(page.contains("<title>toy</title>"), "{page}");
     assert!(page.contains(&format!("content=\"{ws}\"")), "stamped with the socket's port: {page}");
-    assert!(page.contains("<body>hello from plexus-shell</body>"), "an app's own placeholder: {page}");
+    assert!(page.contains("<body>hello from plexus-website</body>"), "an app's own placeholder: {page}");
     assert!(page.to_ascii_lowercase().contains("x-frame-options: deny"), "hardened: {page}");
     let js = get(shell, "/app/app.js").await;
     assert!(js.contains("text/javascript") && js.contains("toy.call"), "{js}");
