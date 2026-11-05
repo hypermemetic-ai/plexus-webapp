@@ -85,9 +85,9 @@ with one activation and an embedded two-file app, and its test runs it.
 
 ## Build and test
 
-A checkout builds against the plexus 0.6 line by sibling path:
-`../plexus-core` and `../plexus-transport` (and `../plexus-macros` for the
-toy) beside this repository.
+A checkout builds against the plexus 0.8 line from crates.io:
+plexus-core 0.8 and plexus-transport 0.7 (and plexus-macros 0.8 for the
+toy).
 
 ```sh
 cargo test --workspace   # the crate's tests and the toy's
