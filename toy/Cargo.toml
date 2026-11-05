@@ -20,8 +20,8 @@ plexus-webapp = { path = "..", default-features = false, features = ["build"] }
 
 [dependencies]
 plexus-webapp = { path = ".." }
-plexus-core = "0.7.0"
-plexus-macros = "0.7.0"
+plexus-core = "0.8.0"
+plexus-macros = "0.8.0"
 async-trait = "0.1"
 uuid = { version = "1", features = ["v4", "v5"] }
 async-stream = "0.3"
