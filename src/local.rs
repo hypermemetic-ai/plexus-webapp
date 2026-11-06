@@ -18,9 +18,9 @@
 //! (synapse, a native client) is admitted as always.
 
 use crate::ShellConfig;
-use plexus_core::plexus::DynamicHub;
-use plexus_transport::websocket::{serve_websocket_with, UpgradeOptions};
-use plexus_transport::{ServerHandle, WebSocketConfig};
+use plexus_rpc::core::plexus::DynamicHub;
+use plexus_rpc::transport::websocket::{serve_websocket_with, UpgradeOptions};
+use plexus_rpc::transport::{ServerHandle, WebSocketConfig};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::oneshot;
@@ -77,7 +77,7 @@ impl LocalServer {
         service: Arc<DynamicHub>,
         module: jsonrpsee::RpcModule<()>,
         cfg: LocalConfig,
-        validator: Option<Arc<dyn plexus_core::plexus::SessionValidator>>,
+        validator: Option<Arc<dyn plexus_rpc::core::plexus::SessionValidator>>,
         options: UpgradeOptions,
     ) -> anyhow::Result<LocalServer> {
         log_activations(&service);

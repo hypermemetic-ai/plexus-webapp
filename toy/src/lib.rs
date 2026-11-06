@@ -4,7 +4,7 @@
 
 use async_stream::stream;
 use futures::Stream;
-use plexus_core::plexus::DynamicHub;
+use plexus_rpc::core::plexus::DynamicHub;
 use plexus_webapp::{AppSource, EmbeddedTable, LocalConfig, LocalServer, ShellConfig};
 use std::sync::Arc;
 
@@ -21,10 +21,10 @@ pub struct EchoActivation;
 #[serde(transparent)]
 pub struct Said(String);
 
-#[plexus_macros::activation(version = "0.1.0", description = "says it back", typed_params)]
+#[plexus_rpc::macros::activation(version = "0.1.0", description = "says it back", typed_params)]
 impl EchoActivation {
     /// Answers `text`, prefixed.
-    #[plexus_macros::method]
+    #[plexus_rpc::macros::method]
     async fn say(&self, text: Said) -> impl Stream<Item = String> + Send + 'static {
         stream! { yield format!("echo: {}", text.0); }
     }

@@ -78,16 +78,16 @@ its service.
 |---|---|---|
 | `build` | `build::embed_dir*` for a build script | none (always compiled) |
 | `serve` | `AppSource`, `ShellConfig`, `router`, `serve_on` | axum, tokio |
-| `local` (default) | `LocalServer`, `LocalConfig`, `rpc_module` | + plexus-core, plexus-transport, jsonrpsee |
+| `local` (default) | `LocalServer`, `LocalConfig`, `rpc_module` | + plexus-rpc (plexus-core, plexus-transport), jsonrpsee |
 
 A worked example lives in this repository at `toy/` (a workspace member). It is a service
 with one activation and an embedded two-file app, and its test runs it.
 
 ## Build and test
 
-A checkout builds against the plexus 0.8 line from crates.io:
-plexus-core 0.8 and plexus-transport 0.7 (and plexus-macros 0.8 for the
-toy).
+A checkout builds against the plexus 0.8 line from crates.io, through the
+`plexus-rpc` 0.8 umbrella (plexus-core 0.8, plexus-transport 0.7, and the
+macros for the toy).
 
 ```sh
 cargo test --workspace   # the crate's tests and the toy's
