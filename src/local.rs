@@ -103,15 +103,16 @@ impl LocalServer {
         // named its own keeps them.
         let mut shell = cfg.shell;
         if shell.hosts.is_empty() {
-            shell.hosts = plexus_rpc::transport::host::loopback_hosts(shell_port);
+            shell.hosts = crate::HostList::named(plexus_rpc::transport::host::loopback_hosts(shell_port));
         }
+        let hosts = shell.hosts.clone();
         let router = crate::router(shell, ws_port).await;
         let (stop, stopped) = oneshot::channel::<()>();
         let shell_task = tokio::spawn(async move {
             let until = async {
                 let _ = stopped.await;
             };
-            if let Err(e) = crate::serve_on(listener, router, until).await {
+            if let Err(e) = crate::serve_on_hosts(listener, router, hosts, until).await {
                 tracing::error!("shell server exited: {e}");
             }
         });
@@ -195,6 +196,17 @@ pub fn log_activations(service: &DynamicHub) {
         tracing::info!("  {} v{} - {}", a.namespace, a.version, a.description);
         for method in &a.methods {
             tracing::info!("    - {}.{}", a.namespace, method);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// KEEL-45: the `serve` half's loopback names are plexus-transport's.
+    #[test]
+    fn the_loopback_names_are_transports() {
+        for port in [1, 4455, 65535] {
+            assert_eq!(crate::HostList::loopback(port).names(), plexus_rpc::transport::host::loopback_hosts(port).as_slice());
         }
     }
 }

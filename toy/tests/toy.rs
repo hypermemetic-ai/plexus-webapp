@@ -116,3 +116,39 @@ async fn the_shell_answers_its_loopback_names_and_refuses_any_other() {
     }
     server.shutdown().await;
 }
+
+/// Serves `router` through plexus-webapp's `serve_on` on a free loopback
+/// port; the port.
+async fn served(router: axum::Router) -> u16 {
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(plexus_webapp::serve_on(listener, router, std::future::pending()));
+    port
+}
+
+/// KEEL-45 (review, no open default): a shell router built naming no hosts
+/// answers no one (421) — never everyone.
+#[tokio::test]
+async fn a_shell_naming_no_hosts_answers_no_one() {
+    let shell = plexus_webapp::ShellConfig::new("toy", plexus_webapp::AppSource::Embedded(plexus_webapp_toy::APP));
+    let port = served(plexus_webapp::router(shell, 1).await).await;
+    let line = get_as(port, &format!("127.0.0.1:{port}"), "/").await;
+    assert!(line.contains(" 421 "), "no hosts named: {line}");
+}
+
+/// KEEL-45 (review): `serve_on` checks `Host` outermost, so a route merged
+/// after the shell's router is covered too; with no list it answers the
+/// loopback names for its port, as plexus-transport does.
+#[tokio::test]
+async fn serve_on_checks_every_route_and_falls_back_to_the_loopback_names() {
+    let mut shell = plexus_webapp::ShellConfig::new("toy", plexus_webapp::AppSource::Embedded(plexus_webapp_toy::APP));
+    shell.hosts = plexus_webapp::HostList::any();
+    let app = plexus_webapp::router(shell, 1).await.merge(axum::Router::new().route("/merged", axum::routing::get(|| async { "merged" })));
+    let port = served(app).await;
+    for path in ["/", "/merged"] {
+        assert!(get_as(port, &format!("127.0.0.1:{port}"), path).await.contains(" 200 "), "{path}: the loopback name");
+        assert!(get_as(port, &format!("localhost:{port}"), path).await.contains(" 200 "), "{path}");
+        let line = get_as(port, &format!("evil.example:{port}"), path).await;
+        assert!(line.contains(" 421 "), "{path}: a rebound name: {line}");
+    }
+}

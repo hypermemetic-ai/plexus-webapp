@@ -59,7 +59,13 @@ async fn run(service: std::sync::Arc<plexus_core::plexus::DynamicHub>) -> anyhow
 ```
 
 To use your own listener, routes or layers, call `router(cfg, ws_port)` and
-`serve_on(listener, router, shutdown)`. `ShellConfig` carries the extras:
+`serve_on(listener, router, shutdown)` (or `serve_on_hosts`). Name the
+shell's hosts (`ShellConfig::hosts`, a `HostList`): with none named,
+`router` answers no one (421), and `serve_on` — which checks `Host`
+outermost, over routes merged after `router` too — answers the loopback
+names for its port; `HostList::any()` is the explicit open state. A tenant
+serving the router itself wraps it in `only_hosts` after merging.
+`ShellConfig` carries the extras:
 `routes` (merged in), `pages` (stamped HTML at a route), `stamps`,
 `root_fallback` (served at `/` when there is no build), `not_built`,
 `mount` (default `/app`), and `csp`.

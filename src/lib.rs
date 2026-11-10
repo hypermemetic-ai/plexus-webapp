@@ -57,7 +57,7 @@ pub use app::{has_entrypoint, mime_of, stamp, AppSource};
 #[cfg(feature = "serve")]
 pub use csp::{page_policy, script_hashes, service_sources, Policy, BARE_CSP, DEFAULT_CSP, FRAME_CSP, PAGE_CSP};
 #[cfg(feature = "serve")]
-pub use shell::{harden, not_built_page, only_hosts, router, serve_on, ShellConfig, HOST_REFUSAL};
+pub use shell::{harden, not_built_page, only_hosts, router, serve_on, serve_on_hosts, HostList, ShellConfig, HOST_REFUSAL};
 #[cfg(feature = "local")]
 pub use local::{log_activations, loopback_origins, rpc_module, LocalConfig, LocalServer};
 
