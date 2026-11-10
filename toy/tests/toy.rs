@@ -51,3 +51,42 @@ async fn the_toy_serves_its_embedded_app_and_its_service() {
         tokio::net::TcpListener::bind(("127.0.0.1", port)).await.unwrap_or_else(|e| panic!("port {port} released: {e}"));
     }
 }
+
+/// The status line of a WebSocket upgrade to `port` naming `host` and, when
+/// given, `origin` — as a browser page would send it.
+async fn upgrade(port: u16, host: &str, origin: Option<&str>) -> String {
+    let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.expect("the socket accepts");
+    let origin = origin.map(|o| format!("Origin: {o}\r\n")).unwrap_or_default();
+    let req = format!(
+        "GET / HTTP/1.1\r\nHost: {host}\r\n{origin}Connection: Upgrade\r\nUpgrade: websocket\r\n\
+         Sec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+    );
+    s.write_all(req.as_bytes()).await.unwrap();
+    let mut buf = vec![0u8; 512];
+    let n = tokio::time::timeout(std::time::Duration::from_secs(5), s.read(&mut buf)).await.expect("an answer").unwrap();
+    String::from_utf8_lossy(&buf[..n]).lines().next().unwrap_or_default().to_string()
+}
+
+/// KEEL-45: the local server takes plexus-transport 0.10.1's front door as
+/// it is (KEEL-29) — the shell's own page opens the socket, a page from any
+/// other origin is refused 403, a name rebound to 127.0.0.1 is refused 421,
+/// and a client with no `Origin` (synapse, a native client) is admitted.
+#[tokio::test]
+async fn the_socket_admits_the_shells_page_and_refuses_any_other() {
+    let server = plexus_webapp_toy::start().await.expect("start");
+    let (ws, shell) = (server.ws_port(), server.shell_port());
+    let own = format!("127.0.0.1:{ws}");
+    for origin in plexus_webapp::loopback_origins(shell) {
+        let line = upgrade(ws, &own, Some(&origin)).await;
+        assert!(line.contains(" 101 "), "the shell's own page ({origin}): {line}");
+    }
+    assert!(upgrade(ws, &own, None).await.contains(" 101 "), "no Origin: a native client");
+    assert!(upgrade(ws, &format!("localhost:{ws}"), None).await.contains(" 101 "), "the loopback name");
+    for origin in ["http://evil.example", &format!("http://127.0.0.1:{ws}1"), "null"] {
+        let line = upgrade(ws, &own, Some(origin)).await;
+        assert!(line.contains(" 403 "), "a page from {origin}: {line}");
+    }
+    let line = upgrade(ws, &format!("evil.example:{ws}"), None).await;
+    assert!(line.contains(" 421 "), "a rebound name: {line}");
+    server.shutdown().await;
+}

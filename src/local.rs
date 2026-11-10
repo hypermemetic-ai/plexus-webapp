@@ -14,8 +14,13 @@
 //!
 //! The socket admits browser pages from the shell's own origin
 //! ([`loopback_origins`]) and from [`LocalConfig::extra_origins`] — a Tauri
-//! webview's are [`crate::TAURI_ORIGINS`]. A caller with no `Origin`
-//! (synapse, a native client) is admitted as always.
+//! webview's are [`crate::TAURI_ORIGINS`]; a page from any other origin is
+//! refused 403. It answers only its loopback names (`127.0.0.1:<port>`,
+//! `localhost:<port>`; any other `Host` is refused 421, so a page that
+//! rebinds its own name to 127.0.0.1 gets nothing) — plexus-transport's
+//! defaults since 0.10.1 (KEEL-29), taken as they are: nothing here opens
+//! them. A caller with no `Origin` (synapse, a native client) is admitted
+//! as always.
 
 use crate::ShellConfig;
 use plexus_rpc::core::plexus::DynamicHub;
@@ -167,9 +172,12 @@ pub fn rpc_module(service: Arc<DynamicHub>) -> anyhow::Result<jsonrpsee::RpcModu
 }
 
 /// A shell's own origins on loopback, which may always open the socket:
-/// its port on 127.0.0.1 and on localhost.
+/// its port on 127.0.0.1 and on localhost — plexus-transport's loopback
+/// names for the port (`host::loopback_hosts`, the list its listeners answer
+/// to by default), each as an `http://` origin (KEEL-45: one list, built in
+/// one place).
 pub fn loopback_origins(shell_port: u16) -> Vec<String> {
-    vec![format!("http://127.0.0.1:{shell_port}"), format!("http://localhost:{shell_port}")]
+    plexus_rpc::transport::host::loopback_hosts(shell_port).into_iter().map(|h| format!("http://{h}")).collect()
 }
 
 /// The startup log: each activation and its methods.

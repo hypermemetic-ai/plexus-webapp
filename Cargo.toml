@@ -18,7 +18,7 @@ members = [".", "toy"]
 #           loopback, started from code
 [package]
 name = "plexus-webapp"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 description = "Serve a Plexus RPC app's frontend build (from disk or embedded in the binary) beside its service, and start the whole server as a library call"
@@ -28,7 +28,7 @@ keywords = ["plexus", "rpc", "embedded", "static-files", "tauri"]
 categories = ["web-programming::http-server"]
 # The crate's own sources; toy/ (the worked example, its own package) stays
 # in the repository.
-include = ["/src/**", "/README.md", "/LICENSE", "/Cargo.toml"]
+include = ["/src/**", "/README.md", "/CHANGELOG.md", "/LICENSE", "/Cargo.toml"]
 
 [features]
 default = ["local"]
@@ -36,7 +36,7 @@ default = ["local"]
 # names the intent in a build-dependency line.
 build = []
 serve = ["dep:axum", "dep:tokio", "dep:tracing", "dep:sha2", "dep:base64"]
-local = ["serve", "dep:plexus-rpc", "dep:jsonrpsee", "dep:anyhow"]
+local = ["serve", "dep:plexus-rpc", "dep:plexus-core", "dep:plexus-transport", "dep:plexus-auth-core", "dep:plexus-macros", "dep:jsonrpsee", "dep:anyhow"]
 
 [dependencies]
 axum = { version = "0.8", optional = true }
@@ -46,9 +46,17 @@ tracing = { version = "0.1", optional = true }
 sha2 = { version = "0.10", optional = true }
 base64 = { version = "0.22", optional = true }
 anyhow = { version = "1", optional = true }
-# The plexus 0.8 line, from crates.io, through the umbrella (PLEXUS-44):
-# plexus-core and plexus-transport.
-plexus-rpc = { version = "0.8.0", optional = true }
+# The plexus 0.11 line, from crates.io, through the umbrella (PLEXUS-44):
+# plexus-core and plexus-transport (KEEL-45; 0.8 before it).
+plexus-rpc = { version = "0.11.0", optional = true }
+# KEEL-45: the floor of the fixed line. plexus-rpc 0.11.0 asks only ^0.11.0 /
+# ^0.10 / ^0.3.1, which a lockfile may hold below the security releases of
+# 2026-11-10 (KEEL-19, KEEL-29, KEEL-31..33); these lines require them. Not
+# named in the code: the umbrella's re-exports are these same crates.
+plexus-core = { version = "0.11.1", default-features = false, optional = true }
+plexus-transport = { version = "0.10.1", default-features = false, optional = true }
+plexus-auth-core = { version = "0.3.2", optional = true }
+plexus-macros = { version = "0.11.1", optional = true }
 # PERF-20: jsonrpsee-core's method table (RpcModule); the socket is plexus-transport's.
 jsonrpsee = { version = "0.26", features = ["server-core"], optional = true }
 
