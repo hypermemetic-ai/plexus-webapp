@@ -26,6 +26,51 @@ pub const DEFAULT_CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsaf
 style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; \
 connect-src 'self' {{SERVICE}}; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 
+/// KEEL-45 (the consolidation review's row 16): the policies a Plexus app
+/// serves, by name, so a tenant takes one rather than writing its own
+/// string. Each is a template [`page_policy`] fills (the two that are not a
+/// page have no placeholder, so filling changes nothing).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Policy {
+    /// The app's page: [`PAGE_CSP`].
+    Page,
+    /// A document drawn inside the page's sandboxed frame: [`FRAME_CSP`].
+    Frame,
+    /// A served file that is not a page — an upload, an image, a download
+    /// opened on its own: [`BARE_CSP`].
+    Bare,
+}
+
+impl Policy {
+    /// The policy's template.
+    pub const fn template(self) -> &'static str {
+        match self {
+            Policy::Page => PAGE_CSP,
+            Policy::Frame => FRAME_CSP,
+            Policy::Bare => BARE_CSP,
+        }
+    }
+}
+
+/// The app's page: [`DEFAULT_CSP`] under its name.
+pub const PAGE_CSP: &str = DEFAULT_CSP;
+
+/// A document in a sandboxed frame (plexus-ui's `/frame`): its scripts,
+/// styles, images and faces load as it wrote them; it opens no connection
+/// (`connect-src 'none'`: no fetch, no socket — the frame's bridge to its
+/// page is its only way out) and submits no form; only its own origin frames
+/// it; and `sandbox` makes it an opaque origin even opened on its own —
+/// never `allow-same-origin`.
+pub const FRAME_CSP: &str = "connect-src 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'self'; \
+sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox";
+
+/// A served file that is not a page: nothing runs (`sandbox`, no script
+/// source), it loads only its own origin's images and media and its inline
+/// styles (an SVG's), connects nowhere, and only its own origin frames it
+/// (menger's media route).
+pub const BARE_CSP: &str = "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; \
+frame-ancestors 'self'; sandbox";
+
 /// `template` filled for one answer: the page's script hashes and the service's
 /// origins as asked for at `host`.
 pub fn page_policy(template: &str, scripts: &str, host: Option<&str>, ws_port: u16) -> String {
@@ -143,6 +188,23 @@ mod tests {
         for bad in [None, Some(""), Some("a b"), Some("a;script-src *"), Some("x'y"), Some("[::1"), Some("a]b")] {
             assert_eq!(service_sources(bad, 4455), "", "{bad:?}");
         }
+    }
+
+    /// The named policies: the page is the default; the frame and the bare
+    /// file run in a sandbox that is never same-origin, connect nowhere and
+    /// have nothing to fill.
+    #[test]
+    fn the_named_policies_say_what_they_are_for() {
+        assert_eq!(Policy::Page.template(), DEFAULT_CSP);
+        for p in [Policy::Frame, Policy::Bare] {
+            let t = p.template();
+            assert!(t.contains("sandbox") && !t.contains("allow-same-origin"), "{p:?}: {t}");
+            assert!(t.contains("frame-ancestors 'self'"), "{p:?}: {t}");
+            assert!(!t.contains("{{"), "{p:?} has no placeholder: {t}");
+            assert_eq!(page_policy(t, "'sha256-x'", Some("h:1"), 2), t, "{p:?}: filling changes nothing");
+        }
+        assert!(FRAME_CSP.contains("connect-src 'none'") && FRAME_CSP.contains("form-action 'none'"));
+        assert!(BARE_CSP.starts_with("default-src 'none';") && !BARE_CSP.contains("script-src"));
     }
 
     /// The default policy, filled: its own scripts and its service, nothing

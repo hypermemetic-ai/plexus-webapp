@@ -55,7 +55,7 @@ mod local;
 #[cfg(feature = "serve")]
 pub use app::{has_entrypoint, mime_of, stamp, AppSource};
 #[cfg(feature = "serve")]
-pub use csp::{service_sources, page_policy, script_hashes, DEFAULT_CSP};
+pub use csp::{page_policy, script_hashes, service_sources, Policy, BARE_CSP, DEFAULT_CSP, FRAME_CSP, PAGE_CSP};
 #[cfg(feature = "serve")]
 pub use shell::{harden, not_built_page, router, serve_on, ShellConfig};
 #[cfg(feature = "local")]
