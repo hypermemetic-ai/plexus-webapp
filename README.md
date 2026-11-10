@@ -30,10 +30,10 @@ A repository of its own beside plexus-core. It began inside
 embedded-app = []
 
 [dependencies]
-plexus-webapp = "0.2"
+plexus-webapp = "0.4"
 
 [build-dependencies]
-plexus-webapp = { version = "0.2", default-features = false, features = ["build"] }
+plexus-webapp = { version = "0.4", default-features = false, features = ["build"] }
 ```
 
 ```rust
@@ -72,6 +72,16 @@ name the page was asked for. The default allows scripts from the app's own
 files, the wasm and those hashes, and connections to the page's origin and
 its service.
 
+The policies a Plexus app serves are named (`Policy`): `PAGE_CSP` (the
+page, `DEFAULT_CSP`), `FRAME_CSP` (a document in a sandboxed frame) and
+`BARE_CSP` (a served file that is not a page). Take one rather than writing
+your own string.
+
+The local server's socket admits a page only from the shell's own origin
+and `extra_origins` (any other `Origin`: 403) and answers only its loopback
+names (any other `Host`: 421) — plexus-transport's defaults, which nothing
+here opens. A client with no `Origin` is admitted.
+
 ## Features
 
 | feature | gives | dependencies |
@@ -85,9 +95,11 @@ with one activation and an embedded two-file app, and its test runs it.
 
 ## Build and test
 
-A checkout builds against the plexus 0.8 line from crates.io, through the
-`plexus-rpc` 0.8 umbrella (plexus-core 0.8, plexus-transport 0.7, and the
-macros for the toy).
+A checkout builds against the plexus 0.11 line from crates.io, through the
+`plexus-rpc` 0.11 umbrella, with the security releases as its floor:
+plexus-core 0.11.1, plexus-transport 0.10.1, plexus-auth-core 0.3.2 and
+plexus-macros 0.11.1 (KEEL-45). Moving from 0.3 (the 0.8 line): CHANGELOG.md,
+"Moving from 0.3".
 
 ```sh
 cargo test --workspace   # the crate's tests and the toy's
