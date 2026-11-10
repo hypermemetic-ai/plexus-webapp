@@ -62,6 +62,14 @@ pub struct ShellConfig {
     /// ([`crate::csp`]). Default [`crate::DEFAULT_CSP`]. The app's own
     /// [`Self::routes`] set their own.
     pub csp: String,
+    /// KEEL-45 (review F4): the `Host` names the shell answers to
+    /// ([`HostList`]); a request naming any other — a name rebound to this
+    /// address (DNS rebinding) — is refused 421 before anything routes it.
+    /// No open default: naming none ([`ShellConfig::new`]'s) is answered by
+    /// no one in [`router`], and by the loopback names for its port where
+    /// the port is known ([`serve_on`], `LocalServer`); everyone only after
+    /// [`HostList::any`], said in code.
+    pub hosts: HostList,
 }
 
 impl ShellConfig {
@@ -78,6 +86,7 @@ impl ShellConfig {
             routes: Router::new(),
             root_files: Vec::new(),
             csp: crate::DEFAULT_CSP.into(),
+            hosts: HostList::default(),
         }
     }
 
@@ -166,6 +175,13 @@ impl Policy {
 /// and [`ShellConfig::routes`]. Not yet hardened — [`serve_on`] does that,
 /// so a caller can layer its own around the app's routes first (a session
 /// check with `route_layer`, say) and merge public ones after.
+///
+/// KEEL-45: its `Host` check ([`ShellConfig::hosts`], by [`only_hosts`]) is
+/// a layer, which covers only the routes present when it is added — so a
+/// route merged after it is not checked here. [`serve_on`] checks again,
+/// outermost; a tenant that serves the router itself wraps it in
+/// [`only_hosts`] after merging. With no hosts named it answers no one
+/// (421): name them, or [`HostList::any`].
 pub async fn router(cfg: ShellConfig, ws_port: u16) -> Router {
     let stamps = cfg.stamps_for(ws_port);
     let mount = match cfg.mount.trim_end_matches('/') {
@@ -204,20 +220,119 @@ pub async fn router(cfg: ShellConfig, ws_port: u16) -> Router {
         r = r.route(route, get(move |headers: HeaderMap| async move { policy.page(&page, &headers) }));
     }
     tracing::info!("App:       {} ({:?})", if mount.is_empty() { "/" } else { &mount }, cfg.app);
-    r.merge(cfg.routes)
+    only_hosts(r.merge(cfg.routes), &cfg.hosts)
+}
+
+/// The body of a refusal of a `Host` not on the list — plexus-transport's
+/// words (`host::REFUSAL`), so a page and its socket refuse alike.
+pub const HOST_REFUSAL: &str = "this server does not answer to that name";
+
+/// KEEL-45: the `Host` names an HTTP listener answers to — named (`host:port`
+/// as a browser sends it, compared exactly, ignoring case), or
+/// [`HostList::any`], the explicit open state. The default names none, which
+/// is answered by no one where no port is known ([`router`]), and by the
+/// loopback names for the port where it is ([`serve_on`]) — never by
+/// everyone.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct HostList {
+    names: Vec<String>,
+    any: bool,
+}
+
+impl HostList {
+    /// These names.
+    pub fn named<I, S>(names: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        Self { names: names.into_iter().map(Into::into).collect(), any: false }
+    }
+
+    /// The names a listener on loopback `port` is reached by:
+    /// `127.0.0.1:<port>` and `localhost:<port>` — plexus-transport's
+    /// `host::loopback_hosts(port)` (the same list; this crate's `serve`
+    /// half does not link the transport).
+    pub fn loopback(port: u16) -> Self {
+        Self::named([format!("127.0.0.1:{port}"), format!("localhost:{port}")])
+    }
+
+    /// Every `Host`, DNS rebinding included: the opt-out, said in code.
+    pub fn any() -> Self {
+        Self { names: Vec::new(), any: true }
+    }
+
+    /// Whether no name is given and the list is not [`HostList::any`].
+    pub fn is_empty(&self) -> bool {
+        !self.any && self.names.iter().all(|n| n.trim().is_empty())
+    }
+
+    /// The names (none for [`HostList::any`]).
+    pub fn names(&self) -> &[String] {
+        &self.names
+    }
+
+    /// Whether this is [`HostList::any`].
+    pub fn is_any(&self) -> bool {
+        self.any
+    }
+}
+
+/// KEEL-45: `router` answering only `hosts` — a request naming another
+/// `Host`, or none, is 421 [`HOST_REFUSAL`]; [`HostList::any`]: `router`
+/// unchanged; an empty list: every request 421 (no open default). The
+/// comparison is plexus-transport's rule (the `Host` header, else the URI's
+/// authority; trimmed, lowercase, exact); transport's own check
+/// (`host::refused`) is crate-private, so it is written here once.
+///
+/// A layer covers only the routes present when it is added: call this
+/// after merging every route it is to cover ([`serve_on`] does, outermost).
+pub fn only_hosts(router: Router, hosts: &HostList) -> Router {
+    if hosts.any {
+        return router;
+    }
+    let allowed: Arc<Vec<String>> = Arc::new(hosts.names.iter().map(|h| h.trim().to_ascii_lowercase()).filter(|h| !h.is_empty()).collect());
+    router.layer(axum::middleware::from_fn(move |req: Request, next: axum::middleware::Next| {
+        let allowed = allowed.clone();
+        async move {
+            let named = match req.headers().get(header::HOST) {
+                Some(v) => v.to_str().ok().map(|h| h.trim().to_ascii_lowercase()),
+                None => req.uri().authority().map(|a| a.as_str().to_ascii_lowercase()),
+            };
+            match named {
+                Some(h) if allowed.contains(&h) => next.run(req).await,
+                _ => (StatusCode::MISDIRECTED_REQUEST, [(header::CONTENT_TYPE, "text/plain")], HOST_REFUSAL).into_response(),
+            }
+        }
+    }))
 }
 
 /// Serves `router` on a listener the caller bound (port 0 binds a free one,
 /// learned before anything starts), [`harden`]ed, until `shutdown`
-/// resolves.
+/// resolves. KEEL-45: `Host` is checked outermost, over every route the
+/// router holds however it was merged, against the loopback names for the
+/// listener's port ([`HostList::loopback`], as plexus-transport answers by
+/// default); name others with [`serve_on_hosts`].
 pub async fn serve_on(
     listener: tokio::net::TcpListener,
     router: Router,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    if let Ok(addr) = listener.local_addr() {
-        tracing::info!("Shell:     http://{addr}/");
-    }
+    serve_on_hosts(listener, router, HostList::default(), shutdown).await
+}
+
+/// [`serve_on`], answering `hosts` ([`HostList::any`]: every `Host`); an
+/// empty list is the loopback names for the listener's port.
+pub async fn serve_on_hosts(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    hosts: HostList,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
+    let addr = listener.local_addr()?;
+    tracing::info!("Shell:     http://{addr}/");
+    let hosts = if hosts.is_empty() { HostList::loopback(addr.port()) } else { hosts };
+    let router = only_hosts(router, &hosts);
     // AUTH-22: with the peer's address, which a sign-in page's throttles
     // read (`ConnectInfo<SocketAddr>`).
     axum::serve(listener, router.layer(axum::middleware::from_fn(harden)).into_make_service_with_connect_info::<std::net::SocketAddr>())
@@ -378,6 +493,8 @@ mod tests {
         cfg.root_files = vec!["manifest.webmanifest".into(), "/icon.png".into(), "gone.png".into()];
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        // KEEL-45: the router answers no one until its hosts are named.
+        cfg.hosts = HostList::loopback(port);
         let app = router(cfg, 1).await;
         tokio::spawn(serve_on(listener, app, std::future::pending()));
 
