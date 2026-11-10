@@ -98,7 +98,14 @@ impl LocalServer {
         let ws_port = addr.port();
         tracing::info!("WebSocket: ws://127.0.0.1:{ws_port}");
 
-        let router = crate::router(cfg.shell, ws_port).await;
+        // KEEL-45 (review F4): the shell answers its loopback names, as the
+        // socket does (plexus-transport's default on loopback); an app that
+        // named its own keeps them.
+        let mut shell = cfg.shell;
+        if shell.hosts.is_empty() {
+            shell.hosts = plexus_rpc::transport::host::loopback_hosts(shell_port);
+        }
+        let router = crate::router(shell, ws_port).await;
         let (stop, stopped) = oneshot::channel::<()>();
         let shell_task = tokio::spawn(async move {
             let until = async {

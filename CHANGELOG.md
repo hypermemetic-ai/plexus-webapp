@@ -23,6 +23,18 @@ building). No source change was needed in the crate for the move.
   421, so a name rebound to 127.0.0.1 gets nothing). A client that sends no
   `Origin` (synapse, a native client, a test) connects as before. Nothing in
   the crate opts out: no `allow_any_origin()`, no `allow_any_host()`.
+- **The shell answers only its names** (the review's F4). `ShellConfig`
+  gains `hosts`; `router` refuses a request naming any other `Host` (421,
+  `HOST_REFUSAL`, plexus-transport's words) before anything routes it, the
+  app's own routes included. `LocalServer` fills it, when the app named
+  none, with the shell's loopback names (`127.0.0.1:<shell>`,
+  `localhost:<shell>`), as its socket answers its own — so a name rebound
+  to 127.0.0.1 gets no page either. `ShellConfig::new` leaves it empty (no
+  check) for a host that checks `Host` itself; `only_hosts(router, hosts)`
+  is the check alone, for `serve_on`. The comparison is written here once,
+  by plexus-transport's rule, because `host::refused` (and
+  `host::normalized`, `host::page_hosts`) are crate-private there; were
+  `host::refused` public (or a public tower layer), this would call it.
 - An `extra_origins` entry `*` was a list entry that matched nothing; now
   the listener refuses to start (plexus-transport 0.10.1: `*` is no
   wildcard).
@@ -72,11 +84,15 @@ In this order:
    holder on `*`. Without the word a method with no target is admitted to a
    role held on any scope. Remove the hand-written `is_everywhere()` check
    it replaces.
-4. **A page served from somewhere other than the shell** (a dev server on
+4. **A shell reached by another name** (a LAN name, a proxy that keeps
+   the public `Host`): name it in `ShellConfig::hosts` (with the loopback
+   names you still want); `LocalServer` fills the loopback names only when
+   the list is empty. A `ShellConfig { .. }` literal adds `hosts`.
+5. **A page served from somewhere other than the shell** (a dev server on
    another port, a webview) names its origin in
    `LocalConfig::extra_origins`; `*` refuses the start. Tauri's are
    `TAURI_ORIGINS`.
-5. **If your app read `<ns>.list_children` / `<ns>.search_children`, or a
+6. **If your app read `<ns>.list_children` / `<ns>.search_children`, or a
    `….schema` path the caller holds nothing under, on a gated service**:
    they are not served now (KEEL-33) or not found (KEEL-32). Call the list
    method through `{ns}.call` by its own grant, and expect a schema only for

@@ -90,3 +90,29 @@ async fn the_socket_admits_the_shells_page_and_refuses_any_other() {
     assert!(line.contains(" 421 "), "a rebound name: {line}");
     server.shutdown().await;
 }
+
+/// The status line of `GET path` on `port` naming `host`.
+async fn get_as(port: u16, host: &str, path: &str) -> String {
+    let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port)).await.expect("the shell accepts");
+    s.write_all(format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+    let mut resp = Vec::new();
+    s.read_to_end(&mut resp).await.unwrap();
+    String::from_utf8_lossy(&resp).lines().next().unwrap_or_default().to_string()
+}
+
+/// KEEL-45 (review F4): the shell answers the names its socket does — its
+/// loopback names — and a rebound name gets 421, as at the socket.
+#[tokio::test]
+async fn the_shell_answers_its_loopback_names_and_refuses_any_other() {
+    let server = plexus_webapp_toy::start().await.expect("start");
+    let shell = server.shell_port();
+    for host in [format!("127.0.0.1:{shell}"), format!("localhost:{shell}"), format!("LOCALHOST:{shell}")] {
+        assert!(get_as(shell, &host, "/").await.contains(" 200 "), "{host}");
+    }
+    for host in [format!("evil.example:{shell}"), "evil.example".to_string(), format!("127.0.0.1:{}", server.ws_port())] {
+        let line = get_as(shell, &host, "/").await;
+        assert!(line.contains(" 421 "), "{host}: {line}");
+        assert!(get_as(shell, &host, "/app/app.js").await.contains(" 421 "), "{host}: an asset too");
+    }
+    server.shutdown().await;
+}

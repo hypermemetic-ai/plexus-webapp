@@ -62,6 +62,14 @@ pub struct ShellConfig {
     /// ([`crate::csp`]). Default [`crate::DEFAULT_CSP`]. The app's own
     /// [`Self::routes`] set their own.
     pub csp: String,
+    /// KEEL-45 (review F4): the `Host` names the shell answers to,
+    /// `host:port` as a browser sends it (compared exactly, ignoring case);
+    /// a request naming any other — a name rebound to this address (DNS
+    /// rebinding) — is refused 421 before anything routes it, the app's own
+    /// [`Self::routes`] included. Empty (the default for [`ShellConfig::new`]):
+    /// no check, for a host that checks `Host` itself; `LocalServer` fills
+    /// it with the shell's loopback names, as its socket's are.
+    pub hosts: Vec<String>,
 }
 
 impl ShellConfig {
@@ -78,6 +86,7 @@ impl ShellConfig {
             routes: Router::new(),
             root_files: Vec::new(),
             csp: crate::DEFAULT_CSP.into(),
+            hosts: Vec::new(),
         }
     }
 
@@ -204,7 +213,37 @@ pub async fn router(cfg: ShellConfig, ws_port: u16) -> Router {
         r = r.route(route, get(move |headers: HeaderMap| async move { policy.page(&page, &headers) }));
     }
     tracing::info!("App:       {} ({:?})", if mount.is_empty() { "/" } else { &mount }, cfg.app);
-    r.merge(cfg.routes)
+    only_hosts(r.merge(cfg.routes), &cfg.hosts)
+}
+
+/// The body of a refusal of a `Host` not on the list — plexus-transport's
+/// words (`host::REFUSAL`), so a page and its socket refuse alike.
+pub const HOST_REFUSAL: &str = "this server does not answer to that name";
+
+/// KEEL-45 (review F4): `router` answering only `hosts` (a request naming
+/// another `Host`, or none, is 421 [`HOST_REFUSAL`]); empty `hosts`:
+/// `router` unchanged. The comparison is plexus-transport's rule (the
+/// `Host` header, else the URI's authority; trimmed, lowercase, exact);
+/// transport's own check (`host::refused`) is crate-private, so it is
+/// written here once.
+pub fn only_hosts(router: Router, hosts: &[String]) -> Router {
+    let allowed: Arc<Vec<String>> = Arc::new(hosts.iter().map(|h| h.trim().to_ascii_lowercase()).filter(|h| !h.is_empty()).collect());
+    if allowed.is_empty() {
+        return router;
+    }
+    router.layer(axum::middleware::from_fn(move |req: Request, next: axum::middleware::Next| {
+        let allowed = allowed.clone();
+        async move {
+            let named = match req.headers().get(header::HOST) {
+                Some(v) => v.to_str().ok().map(|h| h.trim().to_ascii_lowercase()),
+                None => req.uri().authority().map(|a| a.as_str().to_ascii_lowercase()),
+            };
+            match named {
+                Some(h) if allowed.contains(&h) => next.run(req).await,
+                _ => (StatusCode::MISDIRECTED_REQUEST, [(header::CONTENT_TYPE, "text/plain")], HOST_REFUSAL).into_response(),
+            }
+        }
+    }))
 }
 
 /// Serves `router` on a listener the caller bound (port 0 binds a free one,
